@@ -1,4 +1,5 @@
 const DATA_URL = 'data/latest.json';
+const CALGARY_TZ = 'America/Edmonton';
 
 const numberFormat = new Intl.NumberFormat('en-CA', { maximumFractionDigits: 2 });
 const intFormat = new Intl.NumberFormat('en-CA', { maximumFractionDigits: 0 });
@@ -115,6 +116,23 @@ function toComparable(value, type) {
 }
 
 function csvEscape(value) {
+function formatAsOf(value) {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: CALGARY_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute} MT`;
+}
+
   if (value === null || value === undefined) return '';
   const text = String(value);
   if (text.includes(',') || text.includes('"') || text.includes('\n')) {
@@ -382,8 +400,8 @@ function initTabs() {
 }
 
 function updateMeta(rows) {
-  const asof = rows[0]?.asof || '--';
-  document.getElementById('asof').textContent = asof;
+  const asof = rows[0]?.asof;
+  document.getElementById('asof').textContent = formatAsOf(asof);
   document.getElementById('row-count').textContent = rows.length;
 }
 

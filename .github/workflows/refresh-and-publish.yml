@@ -2,7 +2,7 @@ name: Refresh and Publish
 
 on:
   schedule:
-    - cron: "17 15 * * *"
+    - cron: "0 11,12 * * *"
   workflow_dispatch:
 
 jobs:
@@ -33,6 +33,10 @@ jobs:
           if [ -z "$PUBLIC_REPO" ]; then
             echo "Missing PUBLIC_REPO (set as secret)" >&2
             exit 1
+          fi
+          if [ "$(TZ=America/Edmonton date +%H)" != "05" ]; then
+            echo "Skip: not 05:00 MT"
+            exit 0
           fi
           rm -rf public_repo
           git clone "https://x-access-token:${PUBLIC_REPO_PAT}@github.com/${PUBLIC_REPO}.git" public_repo
