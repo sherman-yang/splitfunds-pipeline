@@ -1,6 +1,4 @@
 const DATA_URL = 'data/latest.json';
-const CALGARY_TZ = 'America/Edmonton';
-
 const numberFormat = new Intl.NumberFormat('en-CA', { maximumFractionDigits: 2 });
 const intFormat = new Intl.NumberFormat('en-CA', { maximumFractionDigits: 0 });
 const percentFormat = new Intl.NumberFormat('en-CA', { style: 'percent', maximumFractionDigits: 2 });
@@ -121,16 +119,17 @@ function formatAsOf(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: CALGARY_TZ,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZoneName: 'short',
   }).formatToParts(date);
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute} MT`;
+  const tz = map.timeZoneName ? ` ${map.timeZoneName}` : '';
+  return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}${tz}`;
 }
 
   if (value === null || value === undefined) return '';
