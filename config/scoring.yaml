@@ -1,0 +1,44 @@
+{
+  "conservative": {
+    "hard_filters": {
+      "coverage_min": 1.8,
+      "distance_to_gate_min": 2.0,
+      "classa_intrinsic_min": 0.0001
+    },
+    "weights": {
+      "safety": 45,
+      "valuation": 30,
+      "maturity": 15,
+      "cost": 10
+    },
+    "normalization": {
+      "coverage": {"min": 1.5, "max": 2.5},
+      "distance_to_gate": {"min": 0.0, "max": 5.0},
+      "cushion": {"min": 0.0, "max": 10.0},
+      "discount_to_intrinsic": {"min": 0.0, "max": 0.6},
+      "years_to_maturity": {"ideal_low": 1.0, "ideal_high": 3.0, "max": 7.0},
+      "pref_yield_current": {"min": 0.04, "max": 0.12}
+    }
+  },
+  "aggressive": {
+    "hard_filters": {
+      "coverage_min": 1.6,
+      "distance_to_gate_min": 0.5,
+      "classa_intrinsic_min": 0.0001
+    },
+    "weights": {
+      "safety": 35,
+      "valuation": 40,
+      "maturity": 15,
+      "cost": 10
+    },
+    "normalization": {
+      "coverage": {"min": 1.4, "max": 2.3},
+      "distance_to_gate": {"min": 0.0, "max": 4.0},
+      "cushion": {"min": 0.0, "max": 8.0},
+      "discount_to_intrinsic": {"min": 0.0, "max": 0.7},
+      "years_to_maturity": {"ideal_low": 0.5, "ideal_high": 2.5, "max": 6.0},
+      "pref_yield_current": {"min": 0.04, "max": 0.14}
+    }
+  }
+}

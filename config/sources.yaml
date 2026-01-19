@@ -1,0 +1,11 @@
+{
+  "paths": {
+    "quotes": "data/source/quotes.json",
+    "issuer": "data/source/issuer_daily.json"
+  },
+  "quote_adapter": "scripts.adapters.local_quotes:load_quotes",
+  "issuer_adapter": "scripts.adapters.local_issuer:load_issuer",
+  "price_source": "local_quotes",
+  "nav_source": "local_issuer",
+  "terms_source": "config"
+}

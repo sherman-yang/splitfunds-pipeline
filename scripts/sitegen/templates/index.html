@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Split Share Funds - Tradeable Snapshot</title>
+    <link rel="stylesheet" href="assets/app.css" />
+  </head>
+  <body>
+    <div class="bg-accent"></div>
+    <header class="hero">
+      <div class="hero-inner">
+        <div>
+          <p class="eyebrow">Split Share Funds - Canada</p>
+          <h1>Daily Tradeable Snapshot</h1>
+          <p class="subhead">
+            Class A and Preferred split share funds with structured coverage metrics, discounts, yields, and term risk.
+          </p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <p class="meta-label">Last refresh</p>
+            <p class="meta-value" id="asof">--</p>
+          </div>
+          <div class="meta-card">
+            <p class="meta-label">Rows</p>
+            <p class="meta-value" id="row-count">--</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="tabs">
+        <button class="tab-button active" data-tab="classa">Class A</button>
+        <button class="tab-button" data-tab="preferred">Preferred</button>
+      </section>
+
+      <section class="tab-panel active" id="tab-classa" data-table="classa">
+        <div class="control-bar">
+          <div class="control-block">
+            <label>Search</label>
+            <input type="search" placeholder="Ticker, issuer, theme" data-search />
+          </div>
+          <div class="control-block" data-range-filters></div>
+          <div class="control-block" data-flag-filters></div>
+          <div class="control-block" data-column-toggles></div>
+          <div class="control-block actions">
+            <button class="ghost" data-reset>Reset</button>
+            <button class="solid" data-export>Export CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="tab-preferred" data-table="preferred">
+        <div class="control-bar">
+          <div class="control-block">
+            <label>Search</label>
+            <input type="search" placeholder="Ticker, issuer, theme" data-search />
+          </div>
+          <div class="control-block" data-range-filters></div>
+          <div class="control-block" data-flag-filters></div>
+          <div class="control-block" data-column-toggles></div>
+          <div class="control-block actions">
+            <button class="ghost" data-reset>Reset</button>
+            <button class="solid" data-export>Export CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>Information is for research only. Data may be delayed or contain errors. Not investment advice.</p>
+    </footer>
+
+    <script src="assets/app.js"></script>
+  </body>
+</html>
