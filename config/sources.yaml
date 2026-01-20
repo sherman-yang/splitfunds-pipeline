@@ -1,11 +1,11 @@
 {
   "paths": {
     "quotes": "data/source/quotes.json",
-    "issuer": "data/source/issuer_daily.json"
+    "issuer": "config/issuers.yaml"
   },
   "quote_adapter": "scripts.adapters.local_quotes:load_quotes",
-  "issuer_adapter": "scripts.adapters.local_issuer:load_issuer",
+  "issuer_adapter": "scripts.adapters.issuer_aggregate:load_issuer",
   "price_source": "local_quotes",
-  "nav_source": "local_issuer",
-  "terms_source": "config"
+  "nav_source": "issuer_scrape",
+  "terms_source": "issuer_scrape"
 }

@@ -42,7 +42,7 @@ Output files (generated):
 ### 4.1 Universe and terms
 Edit `config/universe.yaml`.
 
-Each fund entry defines fund-level data and two securities (Class A + Preferred). This is the authoritative source for terms like `pref_par`, `gate_nav`, and `maturity_date`.
+This now defaults to the live TSX directory adapter. You can still add static overrides under `funds` for manual fixes (e.g., `pref_par`, `gate_nav`, `maturity_date`).
 
 ### 4.2 Quotes and total return
 Edit `data/source/quotes.json` (local example). The pipeline expects:
@@ -52,23 +52,22 @@ Edit `data/source/quotes.json` (local example). The pipeline expects:
 
 Replace the local adapter with a real API adapter in private repo for production.
 
-### 4.3 Issuer NAV updates
-Edit `data/source/issuer_daily.json` (local example). The pipeline expects:
+### 4.3 Issuer NAV and terms updates
+Edit `config/issuers.yaml`.
 
-- Fund-level `unit_nav`
-- Optional per-security `nav_self`
-- `dist_status` updates if known
+The issuer aggregator scrapes Brompton, Middlefield, and Quadravest pages to collect tickers, distributions, maturity dates, and NAV where available. You can add or remove issuers in this file.
 
 ## 5. Adapter model (extensible)
 
 Adapters live in `scripts/adapters/` and are called by `scripts/refresh.py`.
 
-- `local_quotes.py` loads quotes from JSON
-- `local_issuer.py` loads NAV/terms from JSON
+- `tsx_directory.py` pulls the split-share universe from TSX.
+- `issuer_aggregate.py` merges issuer scrapes (Brompton, Middlefield, Quadravest).
+- `local_quotes.py` still loads quotes from JSON (replace with your API adapter).
 
-To add a real data provider:
+To add a new issuer or data provider:
 1. Create a new adapter in `scripts/adapters/`.
-2. Update `config/sources.yaml` to point to your adapter and data paths.
+2. Add it in `config/issuers.yaml` or `config/sources.yaml`.
 3. Ensure adapters return the same shape as the local JSON examples.
 
 ## 6. Scoring and validation

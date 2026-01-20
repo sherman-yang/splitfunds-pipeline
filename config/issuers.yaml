@@ -1,0 +1,30 @@
+{
+  "issuers": [
+    {
+      "name": "Brompton",
+      "adapter": "scripts.adapters.issuer_brompton:load_brompton",
+      "base_url": "https://www.bromptongroup.com/funds",
+      "pref_par_default": 10.0,
+      "gate_nav_default": 15.0
+    },
+    {
+      "name": "Middlefield",
+      "adapter": "scripts.adapters.issuer_middlefield:load_middlefield",
+      "base_url": "https://www.middlefield.com/funds",
+      "pref_par_default": 10.0,
+      "gate_nav_default": 15.0
+    },
+    {
+      "name": "Quadravest",
+      "adapter": "scripts.adapters.issuer_quadravest:load_quadravest",
+      "pages": [
+        "https://www.quadravest.com/commerce-split-home",
+        "https://www.quadravest.com/lifesplit-home",
+        "https://www.quadravest.com/m-split-home",
+        "https://www.quadravest.com/tdb-split-home"
+      ],
+      "pref_par_default": 10.0,
+      "gate_nav_default": 15.0
+    }
+  ]
+}

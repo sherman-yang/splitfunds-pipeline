@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import importlib
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,7 +14,14 @@ if str(ROOT) not in sys.path:
 from scripts.compute_metrics import compute_metrics
 from scripts.scoring import score_rows
 from scripts.sitegen.render_index import render_site
-from scripts.utils import asof_timestamp, load_config, parse_iso_date, safe_float, write_json
+from scripts.utils import (
+    asof_timestamp,
+    load_adapter,
+    load_config,
+    parse_iso_date,
+    safe_float,
+    write_json,
+)
 from scripts.validate import validate_rows
 
 
@@ -88,6 +94,69 @@ OUTPUT_FIELDS = [
 ]
 
 
+def _merge_security(existing: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+    merged = existing.copy()
+    for key, value in incoming.items():
+        if merged.get(key) is None and value is not None:
+            merged[key] = value
+    return merged
+
+
+def _merge_fund(existing: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+    merged = existing.copy()
+    for key, value in incoming.items():
+        if key == "securities":
+            continue
+        if merged.get(key) is None and value is not None:
+            merged[key] = value
+    merged["fund_id"] = incoming.get("fund_id") or merged.get("fund_id")
+
+    securities: Dict[str, Dict[str, Any]] = {}
+    for item in existing.get("securities", []) + incoming.get("securities", []):
+        ticker = item.get("ticker")
+        if not ticker:
+            continue
+        current = securities.get(ticker, {})
+        securities[ticker] = _merge_security(current, item)
+    merged["securities"] = list(securities.values())
+    return merged
+
+
+def _merge_funds(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    merged: Dict[str, Dict[str, Any]] = {}
+    for fund in primary:
+        fund_id = fund.get("fund_id")
+        if fund_id:
+            merged[fund_id] = fund
+    for fund in secondary:
+        fund_id = fund.get("fund_id")
+        if not fund_id:
+            continue
+        if fund_id in merged:
+            merged[fund_id] = _merge_fund(merged[fund_id], fund)
+        else:
+            merged[fund_id] = fund
+    return list(merged.values())
+
+
+def resolve_universe(universe_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    adapter_path = universe_cfg.get("adapter")
+    adapter_args = universe_cfg.get("adapter_args", {})
+    static_funds = universe_cfg.get("funds", [])
+
+    if adapter_path:
+        adapter = load_adapter(adapter_path)
+        if isinstance(adapter_args, dict):
+            dynamic = adapter(**adapter_args)
+        else:
+            dynamic = adapter(adapter_args)
+        dynamic_funds = dynamic.get("funds", [])
+        merged = _merge_funds(dynamic_funds, static_funds)
+        return {"funds": merged}
+
+    return universe_cfg
+
+
 def build_base_rows(universe_cfg: Dict[str, Any], asof: str, source_terms: str) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for fund in universe_cfg.get("funds", []):
@@ -120,21 +189,33 @@ def build_base_rows(universe_cfg: Dict[str, Any], asof: str, source_terms: str) 
                 "pref_div_kind": security.get("pref_div_kind"),
                 "pref_yield_issue": security.get("pref_yield_issue"),
                 "nav_self": security.get("nav_self"),
+                "price": security.get("price"),
+                "price_asof": security.get("price_asof"),
                 "asof": asof,
             }
             rows.append(row)
     return rows
 
 
-def load_adapter(adapter_path: str):
-    if ":" not in adapter_path:
-        raise SystemExit(f"Adapter path must be module:callable, got {adapter_path!r}")
-    module_path, func_name = adapter_path.split(":", 1)
-    module = importlib.import_module(module_path)
-    adapter = getattr(module, func_name, None)
-    if adapter is None:
-        raise SystemExit(f"Adapter {func_name!r} not found in {module_path!r}")
-    return adapter
+def _merge_row(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    for key, value in source.items():
+        if target.get(key) is None and value is not None:
+            target[key] = value
+
+
+def augment_rows_from_funds(rows: List[Dict[str, Any]], funds: List[Dict[str, Any]], asof: str, source_terms: str) -> None:
+    extra_rows = build_base_rows({"funds": funds}, asof, source_terms)
+    row_by_ticker = {row.get("ticker"): row for row in rows if row.get("ticker")}
+    for row in extra_rows:
+        ticker = row.get("ticker")
+        if not ticker:
+            continue
+        existing = row_by_ticker.get(ticker)
+        if existing is None:
+            rows.append(row)
+            row_by_ticker[ticker] = row
+        else:
+            _merge_row(existing, row)
 
 
 def apply_issuer(rows: List[Dict[str, Any]], issuer_data: Dict[str, Any], source_name: str) -> None:
@@ -143,11 +224,26 @@ def apply_issuer(rows: List[Dict[str, Any]], issuer_data: Dict[str, Any], source
 
     for fund_id, fund in fund_lookup.items():
         for row in rows:
-            if row.get("fund_id") == fund_id:
-                if fund.get("unit_nav") is not None:
-                    row["unit_nav"] = fund.get("unit_nav")
-                    row["nav_asof_date"] = fund.get("nav_asof_date") or issuer_data.get("asof_date")
-                    row["source_nav"] = source_name
+            if row.get("fund_id") != fund_id:
+                continue
+            for key in [
+                "issuer_manager",
+                "theme",
+                "holdings_hint",
+                "maturity_date",
+                "final_maturity_date",
+                "extendable",
+                "extend_terms_text",
+                "pref_par",
+                "gate_nav",
+                "gate_rule_text",
+            ]:
+                if fund.get(key) is not None:
+                    row[key] = fund.get(key)
+            if fund.get("unit_nav") is not None:
+                row["unit_nav"] = fund.get("unit_nav")
+                row["nav_asof_date"] = fund.get("nav_asof_date") or issuer_data.get("asof_date")
+                row["source_nav"] = source_name
         for security in fund.get("securities", []):
             ticker = security.get("ticker")
             if not ticker:
@@ -162,8 +258,16 @@ def apply_issuer(rows: List[Dict[str, Any]], issuer_data: Dict[str, Any], source
                 row["dist_status"] = security.get("dist_status")
             if security.get("dist_amt") is not None:
                 row["dist_amt"] = security.get("dist_amt")
+            if security.get("dist_freq") is not None:
+                row["dist_freq"] = security.get("dist_freq")
             if security.get("pref_div_amt") is not None:
                 row["pref_div_amt"] = security.get("pref_div_amt")
+            if security.get("pref_div_freq") is not None:
+                row["pref_div_freq"] = security.get("pref_div_freq")
+            if security.get("price") is not None:
+                row["price"] = security.get("price")
+            if security.get("price_asof") is not None:
+                row["price_asof"] = security.get("price_asof")
 
 
 def apply_quotes(rows: List[Dict[str, Any]], quote_data: Dict[str, Any], source_name: str) -> None:
@@ -226,7 +330,7 @@ def main() -> None:
     config_dir = root / args.config
     output_dir = root / args.output
 
-    universe_cfg = load_config(config_dir / "universe.yaml")
+    universe_cfg = resolve_universe(load_config(config_dir / "universe.yaml"))
     sources_cfg = load_config(config_dir / "sources.yaml")
     scoring_cfg = load_config(config_dir / "scoring.yaml")
 
@@ -238,7 +342,6 @@ def main() -> None:
             raise SystemExit("Invalid --asof timestamp")
 
     asof = asof_timestamp(now)
-    rows = build_base_rows(universe_cfg, asof, sources_cfg.get("terms_source", "config"))
 
     quotes_path = root / sources_cfg.get("paths", {}).get("quotes", "data/source/quotes.json")
     issuer_path = root / sources_cfg.get("paths", {}).get("issuer", "data/source/issuer_daily.json")
@@ -251,6 +354,9 @@ def main() -> None:
 
     quote_data = quote_loader(quotes_path)
     issuer_data = issuer_loader(issuer_path)
+
+    rows = build_base_rows(universe_cfg, asof, sources_cfg.get("terms_source", "config"))
+    augment_rows_from_funds(rows, issuer_data.get("funds", []), asof, sources_cfg.get("terms_source", "config"))
 
     apply_quotes(rows, quote_data, sources_cfg.get("price_source", "local_quotes"))
     apply_issuer(rows, issuer_data, sources_cfg.get("nav_source", "local_issuer"))

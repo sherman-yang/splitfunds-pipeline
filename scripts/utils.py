@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -72,9 +73,90 @@ def safe_float(value: Any) -> Optional[float]:
         return None
 
 
+
+
+def parse_money(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    text = text.replace("$", "").replace(",", "").strip()
+    return safe_float(text)
+
+
+def parse_human_date(value: Optional[str]) -> Optional[date]:
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    iso = parse_iso_date(value)
+    if iso:
+        return iso
+    cleaned = value.replace(",", "")
+    parts = cleaned.split()
+    if len(parts) < 3:
+        return None
+    month_token = parts[0].lower()
+    day_token = parts[1].rstrip(",")
+    year_token = parts[2]
+    months = {
+        "jan": 1,
+        "january": 1,
+        "feb": 2,
+        "february": 2,
+        "mar": 3,
+        "march": 3,
+        "apr": 4,
+        "april": 4,
+        "may": 5,
+        "jun": 6,
+        "june": 6,
+        "jul": 7,
+        "july": 7,
+        "aug": 8,
+        "august": 8,
+        "sep": 9,
+        "sept": 9,
+        "september": 9,
+        "oct": 10,
+        "october": 10,
+        "nov": 11,
+        "november": 11,
+        "dec": 12,
+        "december": 12,
+    }
+    month = months.get(month_token)
+    if not month:
+        return None
+    try:
+        day = int(day_token)
+        year = int(year_token)
+    except ValueError:
+        return None
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
 def ensure_list(value: Any) -> list:
     if value is None:
         return []
     if isinstance(value, list):
         return value
     return [value]
+
+def load_adapter(adapter_path: str):
+    if ":" not in adapter_path:
+        raise SystemExit(f"Adapter path must be module:callable, got {adapter_path!r}")
+    module_path, func_name = adapter_path.split(":", 1)
+    module = importlib.import_module(module_path)
+    adapter = getattr(module, func_name, None)
+    if adapter is None:
+        raise SystemExit(f"Adapter {func_name!r} not found in {module_path!r}")
+    return adapter
+

@@ -1,59 +1,10 @@
 {
-  "funds": [
-    {
-      "fund_id": "DFN",
-      "issuer_manager": "Quadravest",
-      "theme": "Canadian financial dividends",
-      "holdings_hint": "Big 6 Canadian banks and insurers",
-      "maturity_date": "2027-12-15",
-      "extendable": true,
-      "extend_terms_text": "Annual 5-year extensions with notice",
-      "pref_par": 10.0,
-      "gate_nav": 15.0,
-      "gate_rule_text": "Class A distributions suspended if Unit NAV < 15",
-      "securities": [
-        {
-          "security_type": "CLASS_A",
-          "ticker": "DFN",
-          "dist_amt": 0.1,
-          "dist_freq": "monthly",
-          "dist_status": "paying"
-        },
-        {
-          "security_type": "PREFERRED",
-          "ticker": "DFN.PR.A",
-          "pref_div_amt": 0.0625,
-          "pref_div_freq": "monthly",
-          "pref_yield_issue": 0.075
-        }
-      ]
-    },
-    {
-      "fund_id": "LBS",
-      "issuer_manager": "Brompton",
-      "theme": "Canadian covered call dividend leaders",
-      "holdings_hint": "Large cap Canadian dividend equities",
-      "maturity_date": "2028-06-30",
-      "extendable": false,
-      "pref_par": 10.0,
-      "gate_nav": 15.0,
-      "gate_rule_text": "Class A distributions suspended if Unit NAV < 15",
-      "securities": [
-        {
-          "security_type": "CLASS_A",
-          "ticker": "LBS",
-          "dist_amt": 0.08,
-          "dist_freq": "monthly",
-          "dist_status": "paying"
-        },
-        {
-          "security_type": "PREFERRED",
-          "ticker": "LBS.PR.A",
-          "pref_div_amt": 0.05625,
-          "pref_div_freq": "monthly",
-          "pref_yield_issue": 0.07
-        }
-      ]
-    }
-  ]
+  "adapter": "scripts.adapters.tsx_directory:load_universe",
+  "adapter_args": {
+    "exchange": "tsx",
+    "queries": ["split"],
+    "require_preferred": true,
+    "exclude_keywords": ["ETF"]
+  },
+  "funds": []
 }
