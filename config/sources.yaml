@@ -3,23 +3,34 @@
     "quotes": "data/source/quotes.json",
     "issuer": "config/issuers.yaml"
   },
-  "quote_adapter": "scripts.adapters.stockanalysis_quotes:load_stockanalysis",
-  "quote_adapter_args": {
-    "exchange": "TSX",
-    "columns": [
-      "price",
-      "volume",
-      "low52",
-      "high52",
-      "tr1y",
-      "tr3y",
-      "tr5y",
-      "tr10y"
-    ],
-    "chunk_size": 50
-  },
+  "quote_adapters": [
+    {
+      "adapter": "scripts.adapters.tmx_graphql_quotes:load_tmx_quotes",
+      "adapter_args": {
+        "locale": "en",
+        "chunk_size": 20
+      }
+    },
+    {
+      "adapter": "scripts.adapters.stockanalysis_quotes:load_stockanalysis",
+      "adapter_args": {
+        "exchange": "TSX",
+        "columns": [
+          "price",
+          "volume",
+          "low52",
+          "high52",
+          "tr1y",
+          "tr3y",
+          "tr5y",
+          "tr10y"
+        ],
+        "chunk_size": 50
+      }
+    }
+  ],
   "issuer_adapter": "scripts.adapters.issuer_aggregate:load_issuer",
-  "price_source": "stockanalysis",
+  "price_source": "tmx_graphql+stockanalysis",
   "nav_source": "issuer_scrape",
   "terms_source": "issuer_scrape"
 }

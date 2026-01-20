@@ -270,6 +270,26 @@ def apply_issuer(rows: List[Dict[str, Any]], issuer_data: Dict[str, Any], source
                 row["price_asof"] = security.get("price_asof")
 
 
+
+
+def merge_quote_rows(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    merged: Dict[str, Dict[str, Any]] = {}
+    for row in primary:
+        ticker = row.get("ticker")
+        if ticker:
+            merged[ticker] = row.copy()
+    for row in secondary:
+        ticker = row.get("ticker")
+        if not ticker:
+            continue
+        existing = merged.get(ticker, {})
+        for key, value in row.items():
+            if existing.get(key) is None and value is not None:
+                existing[key] = value
+        merged[ticker] = existing
+    return list(merged.values())
+
+
 def apply_quotes(rows: List[Dict[str, Any]], quote_data: Dict[str, Any], source_name: str) -> None:
     quote_map = {item["ticker"]: item for item in quote_data.get("rows", []) if item.get("ticker")}
     for row in rows:
@@ -279,18 +299,29 @@ def apply_quotes(rows: List[Dict[str, Any]], quote_data: Dict[str, Any], source_
         quote = quote_map.get(ticker)
         if not quote:
             continue
-        row["price"] = quote.get("price")
-        row["price_kind"] = quote.get("price_kind") or "close"
-        row["price_asof"] = quote.get("price_asof") or quote_data.get("asof")
-        row["volume"] = quote.get("volume")
-        row["high_52w"] = quote.get("high_52w")
-        row["low_52w"] = quote.get("low_52w")
-        row["tr_1y"] = quote.get("tr_1y")
-        row["tr_3y"] = quote.get("tr_3y")
-        row["tr_5y"] = quote.get("tr_5y")
-        row["tr_10y"] = quote.get("tr_10y")
-        row["tr_method"] = quote.get("tr_method") or quote_data.get("tr_method")
-        row["source_price"] = source_name
+        if quote.get("price") is not None:
+            row["price"] = quote.get("price")
+            row["price_kind"] = quote.get("price_kind") or row.get("price_kind") or "close"
+            row["price_asof"] = quote.get("price_asof") or quote_data.get("asof")
+        if quote.get("volume") is not None:
+            row["volume"] = quote.get("volume")
+        if quote.get("high_52w") is not None:
+            row["high_52w"] = quote.get("high_52w")
+        if quote.get("low_52w") is not None:
+            row["low_52w"] = quote.get("low_52w")
+        if quote.get("tr_1y") is not None:
+            row["tr_1y"] = quote.get("tr_1y")
+        if quote.get("tr_3y") is not None:
+            row["tr_3y"] = quote.get("tr_3y")
+        if quote.get("tr_5y") is not None:
+            row["tr_5y"] = quote.get("tr_5y")
+        if quote.get("tr_10y") is not None:
+            row["tr_10y"] = quote.get("tr_10y")
+        if quote.get("tr_method") is not None:
+            row["tr_method"] = quote.get("tr_method")
+        elif quote_data.get("tr_method") is not None and row.get("tr_method") is None:
+            row["tr_method"] = quote_data.get("tr_method")
+        row["source_price"] = quote.get("source_price") or source_name
 
 
 def propagate_pref_yield(rows: List[Dict[str, Any]]) -> None:
@@ -349,26 +380,47 @@ def main() -> None:
     quote_adapter_path = sources_cfg.get("quote_adapter", "scripts.adapters.local_quotes:load_quotes")
     issuer_adapter_path = sources_cfg.get("issuer_adapter", "scripts.adapters.local_issuer:load_issuer")
 
-    quote_loader = load_adapter(quote_adapter_path)
     issuer_loader = load_adapter(issuer_adapter_path)
-
     issuer_data = issuer_loader(issuer_path)
 
     rows = build_base_rows(universe_cfg, asof, sources_cfg.get("terms_source", "config"))
     augment_rows_from_funds(rows, issuer_data.get("funds", []), asof, sources_cfg.get("terms_source", "config"))
 
     tickers = sorted({row.get("ticker") for row in rows if row.get("ticker")})
-    quote_adapter_args = sources_cfg.get("quote_adapter_args", {})
-    if isinstance(quote_adapter_args, dict):
-        quote_payload = {
-            "tickers": tickers,
-            "asof": asof,
-            "path": str(quotes_path),
-            **quote_adapter_args,
-        }
-        quote_data = quote_loader(quote_payload)
+    quote_adapters = sources_cfg.get("quote_adapters")
+    if isinstance(quote_adapters, list) and quote_adapters:
+        merged_rows = []
+        tr_method = None
+        for adapter_cfg in quote_adapters:
+            adapter_path = adapter_cfg.get("adapter")
+            if not adapter_path:
+                continue
+            adapter = load_adapter(adapter_path)
+            adapter_args = adapter_cfg.get("adapter_args", {})
+            payload = {
+                "tickers": tickers,
+                "asof": asof,
+                "path": str(quotes_path),
+                **adapter_args,
+            }
+            data = adapter(payload)
+            merged_rows = merge_quote_rows(merged_rows, data.get("rows", []))
+            if tr_method is None and data.get("tr_method") is not None:
+                tr_method = data.get("tr_method")
+        quote_data = {"asof": asof, "rows": merged_rows, "tr_method": tr_method}
     else:
-        quote_data = quote_loader(quotes_path)
+        quote_loader = load_adapter(quote_adapter_path)
+        quote_adapter_args = sources_cfg.get("quote_adapter_args", {})
+        if isinstance(quote_adapter_args, dict):
+            quote_payload = {
+                "tickers": tickers,
+                "asof": asof,
+                "path": str(quotes_path),
+                **quote_adapter_args,
+            }
+            quote_data = quote_loader(quote_payload)
+        else:
+            quote_data = quote_loader(quotes_path)
 
     apply_quotes(rows, quote_data, sources_cfg.get("price_source", "local_quotes"))
     apply_issuer(rows, issuer_data, sources_cfg.get("nav_source", "local_issuer"))

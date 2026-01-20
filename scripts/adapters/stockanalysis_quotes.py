@@ -55,6 +55,7 @@ def load_stockanalysis(payload: Dict[str, Any]) -> Dict[str, Any]:
             symbol = item.get("s") or ""
             ticker = symbol.split(":", 1)[-1] if ":" in symbol else symbol
             row = {
+                "source_price": "stockanalysis",
                 "ticker": ticker,
                 "price": item.get("price"),
                 "volume": item.get("volume"),
