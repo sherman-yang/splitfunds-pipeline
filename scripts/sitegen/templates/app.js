@@ -113,7 +113,6 @@ function toComparable(value, type) {
   return String(value).toLowerCase();
 }
 
-function csvEscape(value) {
 function formatAsOf(value) {
   if (!value) return '--';
   const date = new Date(value);
@@ -132,6 +131,7 @@ function formatAsOf(value) {
   return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}${tz}`;
 }
 
+function csvEscape(value) {
   if (value === null || value === undefined) return '';
   const text = String(value);
   if (text.includes(',') || text.includes('"') || text.includes('\n')) {
