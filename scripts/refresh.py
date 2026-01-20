@@ -352,11 +352,23 @@ def main() -> None:
     quote_loader = load_adapter(quote_adapter_path)
     issuer_loader = load_adapter(issuer_adapter_path)
 
-    quote_data = quote_loader(quotes_path)
     issuer_data = issuer_loader(issuer_path)
 
     rows = build_base_rows(universe_cfg, asof, sources_cfg.get("terms_source", "config"))
     augment_rows_from_funds(rows, issuer_data.get("funds", []), asof, sources_cfg.get("terms_source", "config"))
+
+    tickers = sorted({row.get("ticker") for row in rows if row.get("ticker")})
+    quote_adapter_args = sources_cfg.get("quote_adapter_args", {})
+    if isinstance(quote_adapter_args, dict):
+        quote_payload = {
+            "tickers": tickers,
+            "asof": asof,
+            "path": str(quotes_path),
+            **quote_adapter_args,
+        }
+        quote_data = quote_loader(quote_payload)
+    else:
+        quote_data = quote_loader(quotes_path)
 
     apply_quotes(rows, quote_data, sources_cfg.get("price_source", "local_quotes"))
     apply_issuer(rows, issuer_data, sources_cfg.get("nav_source", "local_issuer"))

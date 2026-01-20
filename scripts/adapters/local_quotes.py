@@ -6,7 +6,7 @@ from typing import Dict, Any
 from scripts.utils import read_json
 
 
-def load_quotes(path: Path) -> Dict[str, Any]:
+def load_quotes(source: Any) -> Dict[str, Any]:
     """Load quote data from a local JSON file.
 
     Expected shape:
@@ -30,6 +30,16 @@ def load_quotes(path: Path) -> Dict[str, Any]:
       ]
     }
     """
+    path = None
+    if isinstance(source, dict):
+        path_value = source.get("path")
+        if path_value:
+            path = Path(path_value)
+    else:
+        path = Path(source)
+
+    if not path:
+        return {"asof": None, "tr_method": None, "rows": []}
     data = read_json(path)
     if not data:
         return {"asof": None, "tr_method": None, "rows": []}

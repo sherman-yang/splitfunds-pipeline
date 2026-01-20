@@ -3,9 +3,23 @@
     "quotes": "data/source/quotes.json",
     "issuer": "config/issuers.yaml"
   },
-  "quote_adapter": "scripts.adapters.local_quotes:load_quotes",
+  "quote_adapter": "scripts.adapters.stockanalysis_quotes:load_stockanalysis",
+  "quote_adapter_args": {
+    "exchange": "TSX",
+    "columns": [
+      "price",
+      "volume",
+      "low52",
+      "high52",
+      "tr1y",
+      "tr3y",
+      "tr5y",
+      "tr10y"
+    ],
+    "chunk_size": 50
+  },
   "issuer_adapter": "scripts.adapters.issuer_aggregate:load_issuer",
-  "price_source": "local_quotes",
+  "price_source": "stockanalysis",
   "nav_source": "issuer_scrape",
   "terms_source": "issuer_scrape"
 }

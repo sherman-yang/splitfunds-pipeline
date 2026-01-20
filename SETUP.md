@@ -45,12 +45,15 @@ Edit `config/universe.yaml`.
 This now defaults to the live TSX directory adapter. You can still add static overrides under `funds` for manual fixes (e.g., `pref_par`, `gate_nav`, `maturity_date`).
 
 ### 4.2 Quotes and total return
-Edit `data/source/quotes.json` (local example). The pipeline expects:
+Live quotes now come from the StockAnalysis watchlist API (configured in `config/sources.yaml`).
 
-- `price`, `volume`, `high_52w`, `low_52w`
-- `tr_1y`, `tr_3y`, `tr_5y`, `tr_10y`
+The adapter fetches:
+- `price`, `volume`, `low52`, `high52`
+- `tr1y`, `tr3y`, `tr5y`, `tr10y` (converted to decimal total return)
 
-Replace the local adapter with a real API adapter in private repo for production.
+If you want to revert to local data, switch `quote_adapter` back to `scripts.adapters.local_quotes:load_quotes` and point `paths.quotes` to your JSON file.
+
+Note: StockAnalysis does not return data for every TSX preferred share ticker. Any missing rows will remain null until you add a secondary quotes source.
 
 ### 4.3 Issuer NAV and terms updates
 Edit `config/issuers.yaml`.
