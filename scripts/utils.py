@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -83,8 +84,14 @@ def parse_money(value: Any) -> Optional[float]:
     text = str(value).strip()
     if not text:
         return None
-    text = text.replace("$", "").replace(",", "").strip()
-    return safe_float(text)
+    # Many issuer pages embed the amount inside a richer string, e.g.:
+    #   "$0.10000/mo." or "$0.125 quarterly"
+    # Extract the first numeric token rather than requiring a clean float string.
+    cleaned = text.replace("$", "").replace(",", "").strip()
+    match = re.search(r"[-+]?(?:\d*\.\d+|\d+)", cleaned)
+    if not match:
+        return None
+    return safe_float(match.group(0))
 
 
 def parse_human_date(value: Optional[str]) -> Optional[date]:
@@ -159,4 +166,3 @@ def load_adapter(adapter_path: str):
     if adapter is None:
         raise SystemExit(f"Adapter {func_name!r} not found in {module_path!r}")
     return adapter
-

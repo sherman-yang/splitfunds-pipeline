@@ -51,6 +51,18 @@ def _parse_distribution(value: str) -> tuple[Optional[float], Optional[str]]:
     return amount, freq
 
 
+def _parse_percent(value: str) -> Optional[float]:
+    if not value:
+        return None
+    match = re.search(r"[-+]?(?:\d*\.\d+|\d+)", value.replace(",", ""))
+    if not match:
+        return None
+    try:
+        return float(match.group(0)) / 100.0
+    except ValueError:
+        return None
+
+
 def _parse_fund_facts(html: str) -> Dict[str, str]:
     facts: Dict[str, str] = {}
     match = re.search(r"FUND FACTS</h3>(.*?)</ul>", html, re.S | re.I)
@@ -85,7 +97,8 @@ def _parse_maturity_date(html: str) -> Optional[str]:
         text = _clean(item)
         if text.startswith("Maturity Date"):
             parts = text.split("Maturity Date", 1)[-1].strip()
-            parts = parts.replace("(3)", "").strip()
+            # Brompton often annotates the label with a footnote like "(2)".
+            parts = re.sub(r"\(\d+\)", "", parts).strip()
             date = parse_human_date(parts)
             return date.isoformat() if date else None
     return None
@@ -149,6 +162,7 @@ def load_brompton(cfg: Dict[str, Any]) -> Dict[str, Any]:
         dist_freq = None
         pref_div_amt = None
         pref_div_freq = None
+        pref_yield_current = None
         nav_date = None
 
         for item in basic_class:
@@ -168,6 +182,11 @@ def load_brompton(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     nav_date = date.isoformat() if date else nav_date
             if item["label"] == "Distribution":
                 pref_div_amt, pref_div_freq = _parse_distribution(item["value"])
+            # Preferred pages usually show a percentage "Distribution Rate" rather than a cash amount.
+            if item["label"].startswith("Distribution Rate"):
+                # Store as a current yield (decimal), so downstream scoring can use it.
+                # Example: "5.96%" -> 0.0596
+                pref_yield_current = _parse_percent(item["value"])
 
         unit_nav, unit_nav_date = _parse_unit_nav(page)
         nav_asof_date = unit_nav_date or nav_date
@@ -200,6 +219,7 @@ def load_brompton(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     "nav_self": pref_nav,
                     "pref_div_amt": pref_div_amt,
                     "pref_div_freq": pref_div_freq,
+                    "pref_yield_current": pref_yield_current,
                 },
             ],
         }

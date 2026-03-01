@@ -29,6 +29,7 @@ OUTPUT_FIELDS = [
     "fund_id",
     "security_type",
     "ticker",
+    "instrument_kind",
     "asof",
     "issuer_manager",
     "theme",
@@ -162,6 +163,7 @@ def build_base_rows(universe_cfg: Dict[str, Any], asof: str, source_terms: str) 
     for fund in universe_cfg.get("funds", []):
         fund_base = {
             "fund_id": fund.get("fund_id"),
+            "instrument_kind": fund.get("instrument_kind") or "split",
             "issuer_manager": fund.get("issuer_manager"),
             "theme": fund.get("theme"),
             "holdings_hint": fund.get("holdings_hint"),
@@ -188,6 +190,7 @@ def build_base_rows(universe_cfg: Dict[str, Any], asof: str, source_terms: str) 
                 "pref_div_freq": security.get("pref_div_freq"),
                 "pref_div_kind": security.get("pref_div_kind"),
                 "pref_yield_issue": security.get("pref_yield_issue"),
+                "pref_yield_current": security.get("pref_yield_current"),
                 "nav_self": security.get("nav_self"),
                 "price": security.get("price"),
                 "price_asof": security.get("price_asof"),
@@ -264,6 +267,8 @@ def apply_issuer(rows: List[Dict[str, Any]], issuer_data: Dict[str, Any], source
                 row["pref_div_amt"] = security.get("pref_div_amt")
             if security.get("pref_div_freq") is not None:
                 row["pref_div_freq"] = security.get("pref_div_freq")
+            if security.get("pref_yield_current") is not None:
+                row["pref_yield_current"] = security.get("pref_yield_current")
             if security.get("price") is not None:
                 row["price"] = security.get("price")
             if security.get("price_asof") is not None:
@@ -403,7 +408,13 @@ def main() -> None:
                 "path": str(quotes_path),
                 **adapter_args,
             }
-            data = adapter(payload)
+            try:
+                data = adapter(payload)
+            except Exception as exc:
+                # Quote sources are inherently flaky. Prefer a partial refresh (with the other
+                # adapters) over failing the entire daily run.
+                print(f"WARNING: quote adapter failed: {adapter_path}: {exc}", file=sys.stderr)
+                continue
             merged_rows = merge_quote_rows(merged_rows, data.get("rows", []))
             if tr_method is None and data.get("tr_method") is not None:
                 tr_method = data.get("tr_method")

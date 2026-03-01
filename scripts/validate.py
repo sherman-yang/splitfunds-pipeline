@@ -32,7 +32,9 @@ def validate_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 
         if price is None or price <= 0:
             flags.append("price_invalid")
-        if pref_par is None or pref_par <= 0:
+        instrument_kind = (row.get("instrument_kind") or "split").lower()
+        is_etf = instrument_kind == "etf"
+        if not is_etf and (pref_par is None or pref_par <= 0):
             flags.append("pref_par_invalid")
         if unit_nav is None or unit_nav <= 0:
             flags.append("nav_missing")

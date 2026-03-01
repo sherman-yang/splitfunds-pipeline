@@ -123,12 +123,21 @@ def compute_metrics(rows: Iterable[Dict[str, Any]], asof_date: date) -> None:
             pref_div_amt = safe_float(row.get("pref_div_amt"))
             pref_div_freq = row.get("pref_div_freq")
             payments = PAYMENTS_PER_YEAR.get(pref_div_freq, None)
+            existing_yield = safe_float(row.get("pref_yield_current"))
             if pref_div_amt is not None and payments is not None:
                 row["pref_div_cash_annual"] = pref_div_amt * payments
                 if price is not None and price > 0:
                     row["pref_yield_current"] = row["pref_div_cash_annual"] / price
                 else:
                     row["pref_yield_current"] = None
+            elif existing_yield is not None:
+                # Some issuer pages publish a current yield (%) but not the cash distribution amount.
+                # Preserve that value so scoring can incorporate the financing cost.
+                row["pref_yield_current"] = existing_yield
+                if price is not None and price > 0:
+                    row["pref_div_cash_annual"] = existing_yield * price
+                else:
+                    row["pref_div_cash_annual"] = None
             else:
                 row["pref_div_cash_annual"] = None
                 row["pref_yield_current"] = None

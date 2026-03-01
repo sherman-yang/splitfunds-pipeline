@@ -6,5 +6,30 @@
     "require_preferred": true,
     "exclude_keywords": ["ETF"]
   },
-  "funds": []
+  "funds": [
+    {
+      "fund_id": "CLSA",
+      "instrument_kind": "etf",
+      "issuer_manager": "Brompton ETF",
+      "theme": "Brompton Split Corp. Enhanced Equity Income ETF",
+      "securities": [
+        {
+          "security_type": "CLASS_A",
+          "ticker": "CLSA"
+        }
+      ]
+    },
+    {
+      "fund_id": "SPLT",
+      "instrument_kind": "etf",
+      "issuer_manager": "Brompton ETF",
+      "theme": "Brompton Split Corp. Preferred Share ETF",
+      "securities": [
+        {
+          "security_type": "PREFERRED",
+          "ticker": "SPLT"
+        }
+      ]
+    }
+  ]
 }

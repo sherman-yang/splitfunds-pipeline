@@ -8,6 +8,15 @@
       "gate_nav_default": 15.0
     },
     {
+      "name": "Brompton ETFs",
+      "adapter": "scripts.adapters.issuer_brompton_etfs:load_brompton_etfs",
+      "pages": [
+        "https://www.bromptongroup.com/product/brompton-split-corp-enhanced-equity-income-etf/",
+        "https://www.bromptongroup.com/product/brompton-split-corp-preferred-share-etf/"
+      ],
+      "preferred_tickers": ["SPLT"]
+    },
+    {
       "name": "Middlefield",
       "adapter": "scripts.adapters.issuer_middlefield:load_middlefield",
       "base_url": "https://www.middlefield.com/funds",
