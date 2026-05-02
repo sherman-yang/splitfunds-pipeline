@@ -1,14 +1,15 @@
 name: Weekly Split Funds Report
 
 on:
-  schedule:
-    # Sunday 08:00 America/Edmonton (Calgary). GitHub cron is UTC-only and DST-blind,
-    # so we trigger at TWO UTC times that bracket DST and let the workflow self-gate
-    # to "only run if Calgary local hour == 08".
-    #   - Summer (MDT, UTC-6): 14:00 UTC = 08:00 MDT  → run
-    #   - Winter (MST, UTC-7): 15:00 UTC = 08:00 MST  → run
-    - cron: "0 14 * * 0"
-    - cron: "0 15 * * 0"
+  # Disabled temporarily due to Gemini free tier limitations
+  # schedule:
+  #   # Sunday 08:00 America/Edmonton (Calgary). GitHub cron is UTC-only and DST-blind,
+  #   # so we trigger at TWO UTC times that bracket DST and let the workflow self-gate
+  #   # to "only run if Calgary local hour == 08".
+  #   #   - Summer (MDT, UTC-6): 14:00 UTC = 08:00 MDT  → run
+  #   #   - Winter (MST, UTC-7): 15:00 UTC = 08:00 MST  → run
+  #   - cron: "0 14 * * 0"
+  #   - cron: "0 15 * * 0"
   workflow_dispatch: {} # allow manual triggering
 
 permissions:
