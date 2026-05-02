@@ -69,20 +69,20 @@ jobs:
           which jq || sudo apt-get install -y jq
 
       # ──────────────────────────────────────────────────────────────────
-      # Dynamically resolve "highest free-tier-eligible Pro model".
+      # Dynamically resolve "highest free-tier-eligible Flash model".
       # Strategy: query models.list, filter by name pattern matching stable
-      # Pro releases (no -preview, -experimental, -vision, -flash suffix),
+      # Flash releases (to avoid hitting the 50 RPD quota of Pro models),
       # require generateContent support, sort version-aware, take the latest.
-      # If discovery fails, fall back to a known-good model (gemini-2.5-pro).
+      # If discovery fails, fall back to a known-good model (gemini-2.5-flash).
       # ──────────────────────────────────────────────────────────────────
-      - name: Resolve latest stable Pro model
+      - name: Resolve latest stable Flash model
         if: steps.gate.outputs.proceed == 'true'
         id: model
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
-          fallback="gemini-2.5-pro"
+          fallback="gemini-2.5-flash"
           response=$(curl -fsS \
             "https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}" \
             || echo "")
@@ -93,12 +93,12 @@ jobs:
           fi
           model=$(echo "$response" | jq -r '
             .models[]
-            | select(.name | test("^models/gemini-[0-9]+(\\.[0-9]+)?-pro$"))
+            | select(.name | test("^models/gemini-[0-9]+(\\.[0-9]+)?-flash$"))
             | select(.supportedGenerationMethods | index("generateContent"))
             | .name
           ' | sort -V | tail -1 | sed 's|^models/||')
           if [ -z "$model" ]; then
-            echo "::warning::No stable Pro model matched; using fallback ${fallback}"
+            echo "::warning::No stable Flash model matched; using fallback ${fallback}"
             model="${fallback}"
           fi
           echo "Resolved model: ${model}"
