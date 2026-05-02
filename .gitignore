@@ -4,3 +4,5 @@ __pycache__/
 site/
 data/source/
 data/run_report.json
+.splitfunds-workspace/
+.claude/
