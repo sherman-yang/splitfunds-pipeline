@@ -4,5 +4,16 @@ __pycache__/
 site/
 data/source/
 data/run_report.json
+
+# AI Agent workspace (intermediate state, not for git)
 .splitfunds-workspace/
+.splitfunds-workspace.archive-*/
+.splitfunds-cleanup-receipt.txt
+
+# Local act / CI secret stash (never commit)
+.secrets
+
+# Editor / agent metadata
 .claude/
+.gemini/cache/
+.gemini/logs/

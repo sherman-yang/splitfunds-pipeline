@@ -1,0 +1,246 @@
+name: Weekly Split Funds Report
+
+on:
+  schedule:
+    # Sunday 08:00 America/Edmonton (Calgary). GitHub cron is UTC-only and DST-blind,
+    # so we trigger at TWO UTC times that bracket DST and let the workflow self-gate
+    # to "only run if Calgary local hour == 08".
+    #   - Summer (MDT, UTC-6): 14:00 UTC = 08:00 MDT  → run
+    #   - Winter (MST, UTC-7): 15:00 UTC = 08:00 MST  → run
+    - cron: "0 14 * * 0"
+    - cron: "0 15 * * 0"
+  workflow_dispatch: {} # allow manual triggering
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-report
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Generate Split Funds Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ──────────────────────────────────────────────────────────────────
+      # Time gate: only proceed if it's Sunday 08:00 in Calgary
+      # ──────────────────────────────────────────────────────────────────
+      - name: Time gate (Calgary 08:00 only)
+        id: gate
+        run: |
+          calgary_hour=$(TZ=America/Edmonton date +%H)
+          today=$(TZ=America/Edmonton date +%F)
+          dow=$(TZ=America/Edmonton date +%u)   # 7 = Sunday in %u
+          echo "Calgary now: $(TZ=America/Edmonton date)"
+          echo "today=${today}"  >> "$GITHUB_OUTPUT"
+          echo "calgary_hour=${calgary_hour}" >> "$GITHUB_OUTPUT"
+          # workflow_dispatch bypasses the time gate
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${dow}" = "7" ] && [ "${calgary_hour}" = "08" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping: Calgary hour=${calgary_hour}, dow=${dow}. Only run on Sun 08."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node (for Gemini CLI install)
+        if: steps.gate.outputs.proceed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Gemini CLI + jq
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          npm install -g @google/gemini-cli@latest
+          gemini --version
+          which jq || sudo apt-get install -y jq
+
+      # ──────────────────────────────────────────────────────────────────
+      # Dynamically resolve "highest free-tier-eligible Pro model".
+      # Strategy: query models.list, filter by name pattern matching stable
+      # Pro releases (no -preview, -experimental, -vision, -flash suffix),
+      # require generateContent support, sort version-aware, take the latest.
+      # If discovery fails, fall back to a known-good model (gemini-2.5-pro).
+      # ──────────────────────────────────────────────────────────────────
+      - name: Resolve latest stable Pro model
+        if: steps.gate.outputs.proceed == 'true'
+        id: model
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          fallback="gemini-2.5-pro"
+          response=$(curl -fsS \
+            "https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}" \
+            || echo "")
+          if [ -z "$response" ]; then
+            echo "::warning::models.list failed; using fallback ${fallback}"
+            echo "name=${fallback}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          model=$(echo "$response" | jq -r '
+            .models[]
+            | select(.name | test("^models/gemini-[0-9]+(\\.[0-9]+)?-pro$"))
+            | select(.supportedGenerationMethods | index("generateContent"))
+            | .name
+          ' | sort -V | tail -1 | sed 's|^models/||')
+          if [ -z "$model" ]; then
+            echo "::warning::No stable Pro model matched; using fallback ${fallback}"
+            model="${fallback}"
+          fi
+          echo "Resolved model: ${model}"
+          echo "name=${model}" >> "$GITHUB_OUTPUT"
+
+      # ──────────────────────────────────────────────────────────────────
+      # Write Gemini CLI settings.json with:
+      #   - generation: temperature 0.1, maxOutputTokens 65536
+      #   - built-in retry: maxAttempts 10, retryFetchErrors true
+      #   - sub-agent delegation enabled, concurrency capped at 6
+      #   - ALL built-in tools enabled (no tools.allowed allowlist set ⇒
+      #     CLI exposes its full default toolkit: WebFetch, WebSearch, Shell,
+      #     ReadFile, WriteFile, Edit, Grep, Glob, LS, ReadManyFiles, Memory).
+      #     The CLI flag --yolo (in the next step) auto-approves every tool
+      #     invocation, so no interactive confirmation is required.
+      # NOTE: The exact keys for sub-agent enablement in settings.json are
+      # evolving; if first run reports unknown keys, check
+      # geminicli.com/docs/reference/configuration/ and adjust.
+      # ──────────────────────────────────────────────────────────────────
+      - name: Write Gemini CLI settings.json
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          mkdir -p .gemini
+          cat > .gemini/settings.json <<'EOF'
+          {
+            "modelConfigs": {
+              "overrides": [
+                {
+                  "match": {},
+                  "modelConfig": {
+                    "generateContentConfig": {
+                      "temperature": 0.1,
+                      "maxOutputTokens": 65536
+                    }
+                  }
+                }
+              ]
+            },
+            "general": {
+              "maxAttempts": 10,
+              "retryFetchErrors": true
+            },
+            "subagents": {
+              "enabled": true,
+              "maxConcurrent": 6
+            }
+          }
+          EOF
+          echo "settings.json:"
+          cat .gemini/settings.json
+
+      # ──────────────────────────────────────────────────────────────────
+      # Run Gemini CLI with task-level retry (nick-fields/retry@v3).
+      # 3 attempts × up to 60 minutes each. Between attempts, sleep 90s
+      # for rate-limit reset. The SOP's checkpoint mechanism makes this
+      # idempotent: a retry resumes from .splitfunds-workspace/checkpoint.txt.
+      # ──────────────────────────────────────────────────────────────────
+      - name: Generate report (with retry)
+        if: steps.gate.outputs.proceed == 'true'
+        id: generate
+        uses: nick-fields/retry@v3
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          REPORT_DATE:    ${{ steps.gate.outputs.today }}
+          MODEL_NAME:     ${{ steps.model.outputs.name }}
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 90
+          retry_on: error
+          on_retry_command: |
+            echo "::warning::Gemini CLI failed; sleeping then retrying. Resume from checkpoint."
+            ls -la .splitfunds-workspace/ 2>/dev/null || echo "no workspace yet"
+          command: |
+            set -euo pipefail
+            gemini \
+              --model "${MODEL_NAME}" \
+              --yolo \
+              -p "$(cat <<PROMPT
+            今日日期: ${REPORT_DATE} (America/Edmonton, Sunday).
+            使用的模型: ${MODEL_NAME}.
+
+            按照仓库根目录 GEMINI.md(它会自动 import .github/agent/split-funds-report-guide.md
+            的全部 SOP)的所有要求,自主完成 Phase 1 → Phase 6 全流程。
+
+            硬性约束:
+            1. 输出路径: ./reports/Split-Funds-Report-${REPORT_DATE}.md (不要写到仓库根)
+            2. 中途不得询问任何问题——CI 自动触发,无人工交互
+            3. Phase 3 必须使用 Sub-Agent 委派 (Pattern A) 并行抓取每只产品,但
+               并发上限 6 个 (settings.json 已配)
+            4. 工具:WebFetch + WebSearch + 内置 Sub-Agent 全部允许使用
+            5. Phase 6 默认归档:
+                 mv .splitfunds-workspace .splitfunds-workspace.archive-${REPORT_DATE}
+               严禁 rm -rf
+            6. 报告版权人: Sherman Yang
+            7. 完成前必须运行 SOP § 0 第 11 条所列 grep -niE 自检直至零命中
+            8. 如果上次 CI 任务部分写盘 (.splitfunds-workspace/checkpoint.txt 存在),
+               必须从 checkpoint 续接,不要重做已完成的产品
+            9. 最后输出一行: 报告路径 + 归档路径 + § 17 数据缺口数量
+            PROMPT
+            )"
+
+      # ──────────────────────────────────────────────────────────────────
+      # Output validation (mirrors SOP § 8 quality checklist).
+      # ──────────────────────────────────────────────────────────────────
+      - name: Verify outputs
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -e
+          today="${{ steps.gate.outputs.today }}"
+          report="reports/Split-Funds-Report-${today}.md"
+          [ -f "$report" ] || { echo "::error::Report not generated: $report"; ls -la reports/ || true; exit 1; }
+          lines=$(wc -l < "$report")
+          echo "Report exists: $report (${lines} lines)"
+          [ "$lines" -ge 800 ] || { echo "::error::Report too short (${lines} lines)"; exit 1; }
+          # SOP § 0 rule 11 tool-leak self-check
+          if grep -niE "yfinance|MCP|WebFetch|WebSearch|browser[- _]?MCP|Chrome[- _]?MCP|Playwright|Puppeteer|mcp__|sub[- _]?agent|sub_agent|spawn|runtime|context window|auto[- _]?compact|workspace|checkpoint|session_summary|Phase \d|errors\.log|sources\.jsonl|computed\.json|universe\.json|macro\.json|权限拒绝|permission denied|工作空间|会话续接|上下文窗口|上下文溢出|工具调用|子代理" "$report" > /tmp/leaks.txt; then
+            echo "::error::Tool-leak self-check FAILED:"
+            cat /tmp/leaks.txt
+            exit 1
+          fi
+          grep -q "Sherman Yang" "$report" || { echo "::error::Missing Sherman Yang copyright"; exit 1; }
+          echo "All checks passed."
+
+      - name: Commit and push report
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -e
+          git config user.name  "splitfunds-bot"
+          git config user.email "splitfunds-bot@users.noreply.github.com"
+          git add reports/
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."; exit 0
+          fi
+          git commit -m "weekly: Split Funds report ${{ steps.gate.outputs.today }} (model=${{ steps.model.outputs.name }})"
+          git push
+
+      - name: Upload report artifact
+        if: steps.gate.outputs.proceed == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: split-funds-report-${{ steps.gate.outputs.today }}
+          path: reports/Split-Funds-Report-${{ steps.gate.outputs.today }}.md
+          if-no-files-found: warn
+          retention-days: 90

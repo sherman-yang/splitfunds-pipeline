@@ -52,6 +52,61 @@ Split-Funds-Report-YYYY-MM-DD.md
 
 10. **报告完成后必须清理临时文件。** Phase 5 完成后，Agent 必须执行第 0.2.2 节 Phase 6（清理）——默认归档 `.splitfunds-workspace/`，或按用户指示删除/保留。**不允许**任务结束后留下未清理的工作目录。
 
+11. **报告中严禁泄露 Agent 内部工具与基础设施信息。** 报告是面向最终读者(投资者/分析师)的产出，不是 Agent 调试日志。**任何与 Agent 实现相关的术语都必须从报告正文与脚注中剔除**，包括但不限于：
+
+   **(a) 英文工具/平台名称(大小写均禁):**
+   - `WebFetch`、`WebSearch`、`yfinance`、`yfinance MCP`、`browser MCP`、`Chrome MCP`、`Playwright`、`Puppeteer`、`Selenium`、`mcp__*`(任何带 `mcp__` 前缀的工具命名空间)
+   - `Sub-Agent` / `sub_agent` / `sub-agent`、`Agent`(在调度语境下)、`spawn`、`delegation`、`fork`
+   - `runtime`、`token`、`context window`、`auto-compact`、`prompt`、`prompt cache`、`permission denied`、`权限拒绝`
+
+   **(b) 工作底稿/调度名词(SOP/workspace 内部术语,不得出现在报告):**
+   - `workspace`、`.splitfunds-workspace`、`checkpoint`、`checkpoint.txt`、`session_summary`、`session_summary.md`
+   - `Phase 1` / `Phase 2` / ... / `Phase N`、`PHASE-N-DONE` / `PHASE-N-PARTIAL`、`errors.log`、`sources.jsonl`、`computed.json`、`universe.json`、`macro.json`
+   - "round 1/2/3"(多轮会话术语)、"this session"(会话术语,中性 "本报告"代替)
+
+   **(c) 失败原因的工具化描述(必须改写):**
+   - 错误形式 → 中性改写
+   - "yfinance 拒访 / 拒绝" → "实时行情来源当日不可用"
+   - "WebFetch 重试 3 次失败" → "在多次访问中未能取得"
+   - "browser MCP 不可用" / "无 JS 渲染能力" → "页面动态内容当日未能渲染"
+   - "工具调用失败 / 抓取失败" → "未在已查公开来源核验到"
+   - "权限被拒 / runtime 拒绝" → 直接省略原因,只说"未取得"
+   - "上下文窗口 / context window 不足" → 不应在报告中出现(本身只是 Agent 内部状态)
+
+   **(d) 中文等价泄露词(同样禁止):** "工作空间"、"会话续接"、"上下文窗口"、"上下文溢出"、"工具调用"、"抓取失败"(在工具语境下)、"沙盒"、"代理"(指 AI Agent 时)、"模型"(指底层 LLM 时)、"子代理"。
+
+   **(e) 允许且必须保留 — 公开数据源命名引用:** 发行商官网、TMX/TSX、SEDAR+、DBRS Morningstar、Globe and Mail、Yahoo Finance / Yahoo Finance Canada、stockanalysis.com、Bank of Canada、Investing.com 等。**这些是市场数据来源,不是 Agent 工具,引用是 SOP §2.4 / §7.21 强制要求。**
+
+   **(f) 高风险位置 — 这些段落必须重点脱敏:**
+   - 报告抬头的"数据时效"行
+   - § 17 数据缺口、冲突与后续核验清单(最容易藏工具名)
+   - 各产品卡的"数据缺口"行
+   - 免责声明
+   - 文末版权声明前后
+
+   **Why:** 报告是投资者交付物。工具/基础设施信息会让读者疑惑、降低专业度,且 Agent 内部命名(尤其 `MCP`/`yfinance`)可能被误解为"数据来自非主流渠道",影响数据可信度。
+   **How to apply:**
+   - Phase 5 起草报告前先做"读者视角脱敏"——任何谈到"为什么数据缺失"的句子,先问自己"投资者读到这句话能理解吗?",不能就改写。
+   - Phase 5 完成后**必须**运行下述 grep 自检命令(大小写不敏感),命中任意关键字必须修改:
+     ```bash
+     grep -niE "yfinance|MCP|WebFetch|WebSearch|browser[- _]?MCP|Chrome[- _]?MCP|Playwright|Puppeteer|mcp__|sub[- _]?agent|sub_agent|spawn|runtime|context window|auto[- _]?compact|workspace|checkpoint|session_summary|Phase \d|errors\.log|sources\.jsonl|computed\.json|universe\.json|macro\.json|权限拒绝|permission denied|工作空间|会话续接|上下文窗口|上下文溢出|工具调用|子代理" Split-Funds-Report-YYYY-MM-DD.md
+     ```
+   - 命令应输出**零行**(空结果)。任何匹配都必须改写后再次自检。
+
+12. **报告必须包含版权声明。** 每份生成的报告**必须**在抬头(在"重要声明 / 数据时效"块之后)以及报告末尾(免责声明之后或并列)显式包含版权声明。
+   - **默认版权人**:`Sherman Yang` (除非用户在启动任务时显式指定其他版权人)
+   - **格式示例**(中文报告):
+     ```markdown
+     > © {YEAR} **{COPYRIGHT_HOLDER}**. All rights reserved. 本报告版权归 {COPYRIGHT_HOLDER} 所有,未经书面许可不得以任何形式复制、分发、转载或用于商业用途。
+     ```
+   - `{YEAR}` 用报告生成年份(基于报告日期);`{COPYRIGHT_HOLDER}` 默认为 `Sherman Yang`。
+   - 抬头版权声明可以与"数据时效"段并列;文末版权声明应位于免责声明之后,或合并在最后一段块内。
+   - **第 7.1 节报告抬头模板** 与 **第 7.22 节最终报告骨架** 必须包含版权声明位。
+   - 若用户给出的版权人姓名是英文(例 `Sherman Yang`),保持英文不音译;若是中文姓名,保持中文。
+
+   **Why:** 报告是高质量原创智力产品,投资者收到时必须明确归属与使用边界,避免被未授权复制、转售或转载。
+   **How to apply:** Phase 5 写报告时,在抬头模板的"数据时效"行之后立即添加版权块;在报告最后一行添加 footer 版权块;两处必须一致。
+
 ---
 
 ## 0.1 执行顺序：Agent 必须按这个顺序工作
@@ -431,7 +486,7 @@ Round 3: 续接 → Phase 3 剩余 → Phase 4-5 → "完成"
 ## 下一轮启动指令
 请用户发起新会话，给 Agent 这条 prompt：
 
-> "继续 ./split-funds-report-guide.md 任务。读取 .splitfunds-workspace/checkpoint.txt
+> "继续 .github/agent/split-funds-report-guide.md 任务。读取 .splitfunds-workspace/checkpoint.txt
 > 和 session_summary.md 续接。优先抓取以下未完成产品：[ticker 列表]"
 ```
 
@@ -921,14 +976,21 @@ YTM 估算 ≈ [年分红 + (面值 − 买入价) ÷ 剩余年数] ÷ [(面值 
 
 ### 7.1 报告抬头
 
+> [!IMPORTANT]
+> 抬头中**不得引用任何 Agent 内部工具或基础设施名词**(详见 § 0 第 11 条)。"数据时效"段只能描述数据来源类型与可核验性,不能写"yfinance/WebFetch/runtime"等术语。版权声明必须出现在抬头(模板第 6 行)与文末免责声明之后两处。
+
 ```markdown
 # 加拿大 Split Funds 深度投资研报
 
 > 报告生成日期: YYYY-MM-DD
 > 数据抓取时间: YYYY-MM-DD HH:MM 时区
 > 重要声明: 本报告只使用可核验来源；无法核验的数据明确标注，不以推断补齐。
-> 数据时效: NAV 通常滞后 1-5 个交易日；价格为抓取时刻报价，盘中可能波动。
+> 数据时效: NAV 通常滞后 1-5 个交易日；价格为抓取时刻报价，盘中可能波动；任何在多源核验后仍未取得的字段已留空并在 § 17 数据缺口集中列出。
+
+> © {YEAR} **{COPYRIGHT_HOLDER}**. All rights reserved. 本报告版权归 {COPYRIGHT_HOLDER} 所有,未经书面许可不得以任何形式复制、分发、转载或用于商业用途。
 ```
+
+> `{COPYRIGHT_HOLDER}` 默认为 **Sherman Yang**,除非用户在启动任务时显式指定其他版权人。`{YEAR}` 取报告生成年份。
 
 ### 7.2 执行摘要
 
@@ -1290,6 +1352,9 @@ ETF 章节末尾必须有 ETF 横向对比表：
 
 必须包含简短免责声明（中文，例如"本报告仅供研究和信息整理，不构成投资建议。投资前请咨询持牌财务顾问"）。
 
+> [!IMPORTANT]
+> **版权声明位置:** 文末版权声明应紧接在 § 18 免责声明之后(独立于免责声明的引用块,或合并为最后一段)。**抬头版权与文末版权两处必须同时存在且文字一致**(详见 § 0 第 12 条 + § 8.1 检查项)。**§ 18 免责声明本身不得包含工具/基础设施名词**——所有"数据无法核验"原因必须用中性表述(详见 § 0 第 11 条)。
+
 ---
 
 ### 7.19 产品数据卡模板
@@ -1413,6 +1478,8 @@ DBRS 评级 Pfd-3 (high)，最新评级日期 YYYY-MM-DD，来源：DBRS Morning
 > 重要声明:
 > 数据时效:
 
+> © {YEAR} **{COPYRIGHT_HOLDER}**. All rights reserved. 本报告版权归 {COPYRIGHT_HOLDER} 所有,未经书面许可不得以任何形式复制、分发、转载或用于商业用途。
+
 ## 1. 执行摘要
 ## 2. Universe Audit 与数据来源
 ## 3. 宏观环境与短中长期观点
@@ -1447,7 +1514,16 @@ DBRS 评级 Pfd-3 (high)，最新评级日期 YYYY-MM-DD，来源：DBRS Morning
 ## 16. 投资决策流程与风险红线
 ## 17. 数据缺口、冲突与后续核验清单
 ## 18. 免责声明
+
+---
+© {YEAR} {COPYRIGHT_HOLDER}. All rights reserved.
 ```
+
+> **版权占位符替换约定:**
+> - `{YEAR}` 用报告生成年份(基于报告日期 YYYY-MM-DD 中的 YYYY)
+> - `{COPYRIGHT_HOLDER}` 默认 `Sherman Yang`,除非用户启动时显式指定其他姓名
+> - 抬头版权块(§ 7.1)使用完整版本(含"All rights reserved" + 中文使用条款);文末 footer 可使用简短一行 `© {YEAR} {COPYRIGHT_HOLDER}. All rights reserved.`
+> - 两处必须**版权人 + 年份完全一致**;格式可微调(完整 vs. 简短)但不得遗漏任一处
 
 ---
 
@@ -1460,6 +1536,8 @@ DBRS 评级 Pfd-3 (high)，最新评级日期 YYYY-MM-DD，来源：DBRS Morning
 - [ ] 报告文件名包含当天日期，格式 `Split-Funds-Report-YYYY-MM-DD.md`
 - [ ] 报告抬头包含生成日期、抓取时间、声明、时效说明
 - [ ] 报告骨架完整，所有 18 个一级章节都存在
+- [ ] **抬头与文末两处版权声明已就位**(默认 `Sherman Yang`,除非用户启动时显式指定其他姓名);两处文字一致
+- [ ] **工具/基础设施名词脱敏自检通过** — 运行 § 0 第 11 条所列 `grep -niE` 命令,输出必须为零行;任何残留(英文工具名、SOP/workspace 名词、中文等价泄露词)都已改写
 
 ### 8.2 覆盖范围
 
@@ -1580,6 +1658,8 @@ DBRS 评级 Pfd-3 (high)，最新评级日期 YYYY-MM-DD，来源：DBRS Morning
 14. **"最大努力不足"模式** — 单次 WebFetch 失败就放弃该字段,没有尝试子页/SEDAR+/WebSearch/browser MCP 升级链;或主动跳过流动性差/数据不易取得的产品。质量优先于速度——Agent 必须用尽工具能力。
 15. **"未清理工作目录"模式** — 报告生成后留下 `.splitfunds-workspace/` 未询问用户处理,直接结束任务。Phase 6 是必须执行的最后一步。
 16. **"未询问就删除"模式** — Agent 主动 `rm -rf .splitfunds-workspace` 而没有用户明确确认。**默认必须归档(`mv`)**,只有用户明确说"删除"才能 `rm`。
+17. **"工具信息泄露"模式** — 报告中出现 `yfinance MCP`、`WebFetch`、`WebSearch`、`browser MCP`、`sub-agent`、`mcp__*`、`Phase N`、`runtime 拒绝`、"工作空间"、"上下文窗口"等 Agent 内部术语,或在 § 17 数据缺口章节用工具失败作为字段缺失理由(例如"yfinance 拒访")。**Phase 5 必须先做读者视角脱敏 + 运行 § 0 第 11 条所列 `grep -niE` 命令直至零命中**(详见 § 0 第 11 条与 § 8.1 检查清单)。
+18. **"缺版权声明"模式** — 报告抬头或文末缺少版权声明,或两处版权人/年份不一致。**默认版权人 `Sherman Yang`** 必须在抬头(§ 7.1 模板第 6 行)与文末(§ 18 免责声明之后)两处显式出现(详见 § 0 第 12 条)。
 
 ---
 
@@ -1608,7 +1688,7 @@ DBRS 评级 Pfd-3 (high)，最新评级日期 YYYY-MM-DD，来源：DBRS Morning
 
 ---
 
-> **本手册版本：** 2026-05-01  
+> **本手册版本：** 2026-05-01 rev2 (添加 §0/11 工具脱敏 + §0/12 版权要求 + 扩展 §8.1 grep 自检 + §7.18 版权位置说明)  
 > **修订原则：** 任何对手册的修改都必须保持五大核心原则:
 > 1. **零猜测** — 不允许凭训练数据或记忆填充任何字段
 > 2. **当日现场核验** — 所有当前状态字段必须当日从官方来源抓取
