@@ -177,6 +177,7 @@ jobs:
             gemini \
               --model "${MODEL_NAME}" \
               --yolo \
+              --skip-trust \
               -p "$(cat <<PROMPT
             今日日期: ${REPORT_DATE} (America/Edmonton, Sunday).
             使用的模型: ${MODEL_NAME}.
